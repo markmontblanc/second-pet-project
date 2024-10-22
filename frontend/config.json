@@ -1,0 +1,5 @@
+{
+    "BACKEND_RDS_URL": "http://my-alb1-test-1435593874.eu-north-1.elb.amazonaws.com/test_connection/rds",
+    "BACKEND_REDIS_URL": "http://my-alb2-test-587228070.eu-north-1.elb.amazonaws.com/test_connection/redis"
+  }
+  

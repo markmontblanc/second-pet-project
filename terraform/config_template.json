@@ -1,0 +1,5 @@
+{
+    "BACKEND_RDS_URL": "http://${alb_rds_dns}/test_connection/rds",
+    "BACKEND_REDIS_URL": "http://${alb_redis_dns}/test_connection/redis"
+  }
+  
