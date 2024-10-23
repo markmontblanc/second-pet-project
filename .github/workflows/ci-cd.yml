@@ -1,0 +1,179 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:  # Додаємо підтримку ручного запуску
+
+jobs:
+  terraform_job:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Install Terraform
+        run: |
+          echo "Installing Terraform..."
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          wget https://releases.hashicorp.com/terraform/${{ secrets.TF_VERSION }}/terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip
+          unzip terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip -d /usr/local/bin/
+          chmod +x /usr/local/bin/terraform
+          terraform --version  # Check Terraform version
+
+      - name: Terraform Job
+        run: |
+          echo "Starting Terraform Job"
+          echo "Initializing Terraform..."
+          cd ${{ secrets.TF_WORKING_DIR }}  # Change to the Terraform directory
+          terraform init
+          echo "Listing available Terraform workspaces..."
+          terraform workspace list  # List available workspaces
+          echo "Selecting or creating 'test' workspace..."
+          terraform workspace new test || terraform workspace select test  # Create "test" workspace if it doesn't exist, else select it
+          echo "Planning Terraform changes..."
+          terraform plan
+          echo "Applying Terraform changes..."
+          terraform apply -auto-approve
+          echo "Extracting outputs from Terraform..."
+          echo "PUBLIC_IP=$(terraform output -raw bastion_public_ip)" >> $GITHUB_ENV
+          echo "PRIVATE_IP=$(terraform output -raw private_ec2_private_ip)" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY_RDS=$(terraform output -raw ecr_repository_rds)" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY_REDIS=$(terraform output -raw ecr_repository_redis)" >> $GITHUB_ENV
+          cp petp_keypair-test private_key.pem  # Copy the generated key
+          chmod 600 private_key.pem  # Make the key available for SSH
+
+      - name: Verify Files
+        run: |
+          echo "Checking current directory and files..."
+          pwd  # Print the current directory
+          ls -la  # Verify the contents of the current directory
+
+      - name: Move Artifacts
+        run: |
+          mv variables.env private_key.pem ${{ github.workspace }}/ || true  # Move files if they exist
+          echo "Listing files to verify variables.env and private_key.pem exist..."
+          ls -la ${{ github.workspace }}/  # Verify if variables.env and private_key.pem are in the working directory
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: terraform-artifacts
+          path: |
+            variables.env
+            private_key.pem
+            ${{ secrets.TF_WORKING_DIR }}/.terraform
+            ${{ secrets.TF_WORKING_DIR }}/terraform.tfstate.d/test/terraform.tfstate
+
+  docker_build_and_push:
+    runs-on: ubuntu-latest
+    needs: terraform_job
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to ECR for backend_rds
+        run: |
+          aws ecr get-login-password --region ${{ secrets.REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_RDS }}
+
+      - name: Build and push Docker image for backend_rds
+        run: |
+          cd backend_rds
+          docker build -t backend_rds .  
+          docker tag backend_rds:latest ${{ secrets.ECR_REPOSITORY_RDS }}:latest
+          docker push ${{ secrets.ECR_REPOSITORY_RDS }}:latest
+          cd ..
+
+      - name: Log in to ECR for backend_redis
+        run: |
+          aws ecr get-login-password --region ${{ secrets.REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_REDIS }}
+
+      - name: Build and push Docker image for backend_redis
+        run: |
+          cd backend_redis
+          docker build -t backend_redis .
+          docker tag backend_redis:latest ${{ secrets.ECR_REPOSITORY_REDIS }}:latest
+          docker push ${{ secrets.ECR_REPOSITORY_REDIS }}:latest
+
+  deploy_application:
+    runs-on: ubuntu-latest
+    needs: [terraform_job, docker_build_and_push]
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install SSH and Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-client docker.io
+
+      - name: Load environment variables
+        run: |
+          echo "Loading environment variables..."
+          source variables.env
+          chmod 600 private_key.pem  # Ensure private key permissions are correct
+
+      - name: SSH into Bastion Host
+        run: |
+          echo "Connecting to Bastion Host with SSH agent forwarding..."
+          eval $(ssh-agent)
+          ssh-add private_key.pem  # Add private key for SSH access
+          ssh -A -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP << 'EOF'
+            echo 'Checking Bastion Hostname:';
+            hostname;  
+            echo 'Connecting from Bastion to Private EC2 Instance...'; 
+            ssh -o StrictHostKeyChecking=no ec2-user@$PRIVATE_IP << 'INNER_EOF'
+              echo "Connected to Private EC2 Instance";
+              echo "Checking Private EC2 Instance Hostname:";
+              hostname;  
+
+              echo "Installing Docker Compose...";
+              sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose;
+              sudo chmod +x /usr/local/bin/docker-compose;
+
+              echo "Copying docker-compose.yaml from S3...";
+              aws s3 cp s3://petp-tf-bucket-test/docker-compose.yaml /home/ec2-user/docker-compose.yaml;
+
+              echo "Starting Docker Compose...";
+              sudo /usr/local/bin/docker-compose -f /home/ec2-user/docker-compose.yaml up -d;
+              echo "Docker Compose started successfully!"
+            INNER_EOF
+          EOF
+
+  terraform_destroy:
+    runs-on: ubuntu-latest
+    needs: [terraform_job, docker_build_and_push, deploy_application]
+    if: github.event_name == 'workflow_dispatch'  # Запуск вручну
+    steps:
+      - name: Install Terraform
+        run: |
+          echo "Installing Terraform..."
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          wget https://releases.hashicorp.com/terraform/${{ secrets.TF_VERSION }}/terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip
+          unzip terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip -d /usr/local/bin/
+          chmod +x /usr/local/bin/terraform
+          terraform --version  # Check Terraform version
+
+      - name: Terraform Destroy
+        run: |
+          echo "Initializing Terraform for destruction..."
+          cd ${{ secrets.TF_WORKING_DIR }}  # Change to the Terraform directory
+          terraform init  # Re-initialize Terraform to install required plugins
+          echo "Selecting 'test' workspace..."
+          terraform workspace select test  # Select the "test" workspace
+          echo "Destroying Terraform resources..."
+          terraform destroy -auto-approve  # Automatically approve destruction
+          echo "Cleaning up resources..."
+          rm -rf ${{ secrets.TF_WORKING_DIR }}/.terraform  # Remove .terraform directory
+          rm -f ${{ secrets.TF_WORKING_DIR }}/terraform.tfstate.d/test/terraform.tfstate  # Remove state file
+          echo "Removing private key..."
+          rm -f private_key.pem  # Remove the private key
