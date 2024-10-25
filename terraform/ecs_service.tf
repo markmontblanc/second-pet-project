@@ -1,28 +1,35 @@
+
+
 resource "aws_ecs_service" "redis_service" {
   name            = "redis-service"
-  cluster         = aws_ecs_cluster.main.id
+  cluster         = aws_ecs_cluster.petp_cluster.id
   task_definition = aws_ecs_task_definition.redis_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.private_subnet.id]  # Приватні підмережі для Fargate
-    security_groups = [aws_security_group.private_inst_sg.id]  # Security Group для Redis
-    assign_public_ip = false  # Тому що використовуємо приватну підмережу
+    subnets         = [aws_subnet.private_subnet_a.id]
+    security_groups = [aws_security_group.redis_sg.id]
+    assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.redis_tg.arn
-    container_name   = "redis"
-    container_port   = 6379
-  }
-
-  depends_on = [
-    aws_lb_target_group.redis_tg,
-    aws_lb_listener.frontend_listener
-  ]
-
-  tags = {
-    Name = "redis-service-${terraform.workspace}"
-  }
+  depends_on = [aws_lb.my_alb]
 }
+
+resource "aws_ecs_service" "backend_rds_service" {
+  name            = "backend-rds-service"
+  cluster         = aws_ecs_cluster.petp_cluster.id
+  task_definition = aws_ecs_task_definition.backend_rds_task.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [aws_subnet.private_subnet_a.id]
+    security_groups = [aws_security_group.backend_rds_sg.id]
+    assign_public_ip = false
+  }
+
+  depends_on = [aws_lb.my_alb]
+}
+
+

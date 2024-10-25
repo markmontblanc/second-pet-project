@@ -1,3 +1,5 @@
+
+
 # Створення бакету
 resource "aws_s3_bucket" "example" {
   bucket = "petp-tf-bucket-${terraform.workspace}"
@@ -54,6 +56,7 @@ resource "aws_cloudfront_origin_access_identity" "example" {
 }
 
 
+/*
 
 # Створення CloudFront Distribution
 resource "aws_cloudfront_distribution" "my_distribution" {
@@ -103,3 +106,6 @@ resource "aws_cloudfront_distribution" "my_distribution" {
     Name = "CloudFront distribution for S3 - ${terraform.workspace}"
   }
 }
+
+*/
+

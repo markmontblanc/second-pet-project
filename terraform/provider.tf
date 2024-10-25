@@ -1,5 +1,3 @@
-# Початок конфігурації AWS, створення ssh key
-
 terraform {
   required_providers {
     aws = {

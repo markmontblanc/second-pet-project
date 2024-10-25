@@ -1,7 +1,7 @@
-resource "aws_ecs_cluster" "redis_cluster" {
-  name = "redis-cluster-${terraform.workspace}"
+resource "aws_ecs_cluster" "petp_cluster" {
+  name = "petp-cluster-${terraform.workspace}"
 
   tags = {
-    Name = "redis-cluster-${terraform.workspace}"
+    Name = "petp-cluster-${terraform.workspace}"
   }
 }
