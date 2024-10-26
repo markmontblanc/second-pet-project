@@ -103,11 +103,11 @@ jobs:
       - name: Apply Terraform for ECS
         run: terraform apply -auto-approve
         working-directory: ./terraform
-        
+      
       - name: Upload Terraform State
         uses: actions/upload-artifact@v2
         with:
-          name: terraform-state  # Назва артефакту
+          name: terraform-state  # Name of the artifact to be stored
           path: |
             ./terraform/.terraform
             ./terraform/terraform.tfstate.d
