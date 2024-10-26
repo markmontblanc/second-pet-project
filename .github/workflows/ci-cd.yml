@@ -1,130 +1,153 @@
-name: CI/CD Pipeline
+name: Deploy to AWS
 
 on:
   push:
     branches:
-      - master
-  workflow_dispatch:  # Додаємо підтримку ручного запуску
+      - master  # Automatically triggers only the setup-ecr job
+  workflow_dispatch:  # Allows manual triggering for the entire workflow
+
+env:
+  AWS_REGION: "eu-north-1"
+  ECR_URI_REDIS: "654654200977.dkr.ecr.eu-north-1.amazonaws.com/petp_redis_repo_default:latest"
+  ECR_URI_BACKEND: "654654200977.dkr.ecr.eu-north-1.amazonaws.com/petp_rds_repo_default:latest"
+  TF_VERSION: "1.9.7"
 
 jobs:
-  terraform_job:
+  setup-ecr:
+    name: Terraform Apply for ECR Repositories
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
       
       - name: Install Terraform
-        run: |
-          echo "Installing Terraform..."
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          wget https://releases.hashicorp.com/terraform/${{ secrets.TF_VERSION }}/terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip
-          unzip terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip -d /usr/local/bin/
-          chmod +x /usr/local/bin/terraform
-          terraform --version  # Check Terraform version
-
-      - name: Terraform Job
-        run: |
-          echo "Starting Terraform Job"
-          echo "Initializing Terraform..."
-          cd ${{ secrets.TF_WORKING_DIR }}  # Change to the Terraform directory
-          terraform init
-          echo "Listing available Terraform workspaces..."
-          terraform workspace list  # List available workspaces
-          echo "Selecting or creating 'test' workspace..."
-          terraform workspace new test || terraform workspace select test  # Create "test" workspace if it doesn't exist, else select it
-          echo "Planning Terraform changes..."
-          terraform plan
-          echo "Applying Terraform changes..."
-          terraform apply -auto-approve
-          echo "Extracting outputs from Terraform..."
-    
-          echo "ECR_REPOSITORY_RDS=$(terraform output -raw ecr_repository_rds)" >> variables.env
-          echo "ECR_REPOSITORY_REDIS=$(terraform output -raw ecr_repository_redis)" >> variables.env
-          
-      - name: Verify Files
-        run: |
-          echo "Checking current directory and files..."
-          pwd  # Print the current directory
-          ls -la  # Verify the contents of the current directory
-
-      - name: Move Artifacts
-        run: |
-          mv variables.env ${{ github.workspace }}/ || true  # Move files if they exist
-          echo "Listing files to verify variables.env exist..."
-          ls -la ${{ github.workspace }}/  # Verify if variables.env and private_key.pem are in the working directory
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v2
+        uses: hashicorp/setup-terraform@v2
         with:
-          name: terraform-artifacts
-          path: |
-            variables.env
-            ${{ secrets.TF_WORKING_DIR }}/.terraform
-            ${{ secrets.TF_WORKING_DIR }}/terraform.tfstate.d/test/terraform.tfstate
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Initialize Terraform
+        run: terraform init
+        working-directory: ./terraform
+      
+      - name: Apply Terraform for ECR Repos
+        run: terraform apply -target=aws_ecr_repository.private_repo_redis -target=aws_ecr_repository.private_repo_rds -auto-approve
+        working-directory: ./terraform
 
-  docker_build_and_push:
+    
+
+  build-and-push:
+    name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    needs: terraform_job
-    if: github.event_name == 'workflow_dispatch'
+    needs: setup-ecr
+    if: ${{ github.event_name == 'workflow_dispatch' }}  # Makes this job manual
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Log in to ECR for backend_rds
+      - name: Log in to ECR for Redis Image
         run: |
-          aws ecr get-login-password --region ${{ secrets.REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_RDS }}
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ env.ECR_URI_REDIS }}
 
-      - name: Build and push Docker image for backend_rds
-        run: |
-          cd backend_rds
-          docker build -t backend_rds .  
-          docker tag backend_rds:latest ${{ secrets.ECR_REPOSITORY_RDS }}:latest
-          docker push ${{ secrets.ECR_REPOSITORY_RDS }}:latest
-          cd ..
-
-      - name: Log in to ECR for backend_redis
-        run: |
-          aws ecr get-login-password --region ${{ secrets.REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_REDIS }}
-
-      - name: Build and push Docker image for backend_redis
+      - name: Build, Tag, and Push Redis Image
         run: |
           cd backend_redis
-          docker build -t backend_redis .
-          docker tag backend_redis:latest ${{ secrets.ECR_REPOSITORY_REDIS }}:latest
-          docker push ${{ secrets.ECR_REPOSITORY_REDIS }}:latest
+          docker build -t my-redis-image .
+          docker tag my-redis-image:latest ${{ env.ECR_URI_REDIS }}
+          docker push ${{ env.ECR_URI_REDIS }}
 
+      - name: Log in to ECR for Backend Image
+        run: |
+          cd ../backend_rds
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ env.ECR_URI_BACKEND }}
 
+      - name: Build, Tag, and Push Backend Image
+        run: |
+          docker build -t my-backend-image .
+          docker tag my-backend-image:latest ${{ env.ECR_URI_BACKEND }}
+          docker push ${{ env.ECR_URI_BACKEND }}
 
-  terraform_destroy:
+  deploy-ecs:
+    name: Terraform Apply for ECS Services
     runs-on: ubuntu-latest
-    needs: [terraform_job, docker_build_and_push, deploy_application]
-    if: github.event_name == 'workflow_dispatch'  # Запуск вручну
+    needs: build-and-push
+    if: ${{ github.event_name == 'workflow_dispatch' }}  # Makes this job manual
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
       - name: Install Terraform
-        run: |
-          echo "Installing Terraform..."
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          wget https://releases.hashicorp.com/terraform/${{ secrets.TF_VERSION }}/terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip
-          unzip terraform_${{ secrets.TF_VERSION }}_linux_amd64.zip -d /usr/local/bin/
-          chmod +x /usr/local/bin/terraform
-          terraform --version  # Check Terraform version
-
-      - name: Terraform Destroy
-        run: |
-          echo "Initializing Terraform for destruction..."
-          cd ${{ secrets.TF_WORKING_DIR }}  # Change to the Terraform directory
-          terraform init  # Re-initialize Terraform to install required plugins
-          echo "Selecting 'test' workspace..."
-          terraform workspace select test  # Select the "test" workspace
-          echo "Destroying Terraform resources..."
-          terraform destroy -auto-approve  # Automatically approve destruction
-          echo "Cleaning up resources..."
-          rm -rf ${{ secrets.TF_WORKING_DIR }}/.terraform  # Remove .terraform directory
-          rm -f ${{ secrets.TF_WORKING_DIR }}/terraform.tfstate.d/test/terraform.tfstate  # Remove state file
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Initialize Terraform
+        run: terraform init
+        working-directory: ./terraform
+      
+      - name: Apply Terraform for ECS
+        run: terraform apply -auto-approve
+        working-directory: ./terraform
         
+      - name: Upload Terraform State
+        uses: actions/upload-artifact@v2
+        with:
+          name: terraform-state  # Назва артефакту
+          path: |
+            ./terraform/.terraform
+            ./terraform/terraform.tfstate.d
+            ./terraform/terraform.tfstate
+
+  destroy-infrastructure:
+    name: Destroy AWS Infrastructure
+    runs-on: ubuntu-latest
+    needs: deploy-ecs
+    if: ${{ github.event_name == 'workflow_dispatch' }}  # Makes this job manual
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Restore Terraform State
+        uses: actions/download-artifact@v2
+        with:
+          name: terraform-state  # The name of the artifact containing the Terraform state files
+
+      - name: Destroy Infrastructure
+        run: terraform destroy -auto-approve
+        working-directory: ./terraform
+        env:
+          TF_WORKING_DIR: "./terraform"
+
+    artifacts:
+      - name: terraform-state
+        paths:
+          - ./terraform/.terraform  # Directory containing the Terraform configuration
+          - ./terraform/terraform.tfstate.d  # Directory with state files
+          - ./terraform/terraform.tfstate  # Main state file
