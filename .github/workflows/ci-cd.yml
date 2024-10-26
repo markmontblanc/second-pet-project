@@ -71,12 +71,12 @@ jobs:
 
       - name: Log in to ECR for Backend Image
         run: |
-          cd ../backend_rds
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
           docker login --username AWS --password-stdin ${{ env.ECR_URI_BACKEND }}
 
       - name: Build, Tag, and Push Backend Image
         run: |
+          cd backend_rds
           docker build -t my-backend-image .
           docker tag my-backend-image:latest ${{ env.ECR_URI_BACKEND }}
           docker push ${{ env.ECR_URI_BACKEND }}
