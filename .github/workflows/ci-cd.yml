@@ -49,7 +49,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      
+
+      - name: Configure AWS credentials  # Added this step
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Log in to ECR for Redis Image
         run: |
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
@@ -73,6 +80,9 @@ jobs:
           docker build -t my-backend-image .
           docker tag my-backend-image:latest ${{ env.ECR_URI_BACKEND }}
           docker push ${{ env.ECR_URI_BACKEND }}
+
+
+
 
   deploy-ecs:
     name: Terraform Apply for ECS Services
