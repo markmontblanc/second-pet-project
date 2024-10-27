@@ -88,7 +88,6 @@ jobs:
     name: Terraform Apply for ECS Services
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: ${{ github.event_name == 'workflow_dispatch' }}  # Makes this job manual
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -112,21 +111,11 @@ jobs:
       - name: Apply Terraform for ECS
         run: terraform apply -auto-approve
         working-directory: ./terraform
-      
-      - name: Upload Terraform State
-        uses: actions/upload-artifact@v2
-        with:
-          name: terraform-state  # Name of the artifact to be stored
-          path: |
-            ./terraform/.terraform
-            ./terraform/terraform.tfstate.d
-            ./terraform/terraform.tfstate
 
   destroy-infrastructure:
     name: Destroy AWS Infrastructure
     runs-on: ubuntu-latest
-    needs: deploy-ecs
-    if: ${{ github.event_name == 'workflow_dispatch' }}  # Makes this job manual
+    if: ${{ github.event_name == 'workflow_dispatch' }}  # Робимо його доступним тільки вручну
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -151,4 +140,5 @@ jobs:
       - name: Destroy Infrastructure
         run: terraform destroy -auto-approve
         working-directory: ./terraform
+
 
