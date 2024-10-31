@@ -13,6 +13,10 @@ resource "aws_ecs_service" "redis_service" {
     assign_public_ip = false
   }
 
+  deployment_controller {
+    type = "ECS"  # Або "CODE_DEPLOY", якщо використовуєте
+  }
+
   depends_on = [aws_lb.my_alb]
 }
 
@@ -27,6 +31,10 @@ resource "aws_ecs_service" "backend_rds_service" {
     subnets         = [aws_subnet.private_subnet_a.id]
     security_groups = [aws_security_group.backend_rds_sg.id]
     assign_public_ip = false
+  }
+
+  deployment_controller {
+    type = "ECS"  # Або "CODE_DEPLOY", якщо використовуєте
   }
 
   depends_on = [aws_lb.my_alb]

@@ -56,7 +56,7 @@ resource "aws_cloudfront_origin_access_identity" "example" {
 }
 
 
-/*
+
 
 # Створення CloudFront Distribution
 resource "aws_cloudfront_distribution" "my_distribution" {
@@ -107,5 +107,5 @@ resource "aws_cloudfront_distribution" "my_distribution" {
   }
 }
 
-*/
+
 

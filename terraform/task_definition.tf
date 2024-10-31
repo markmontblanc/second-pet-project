@@ -1,6 +1,4 @@
 
-
-
 # Defining Redis ECS Task Definition
 resource "aws_ecs_task_definition" "redis_task" {
   family                   = "redis-task-${terraform.workspace}"
@@ -38,6 +36,12 @@ resource "aws_ecs_task_definition" "redis_task" {
       ]
     }
   ])
+
+  # Додаємо параметри для повторних спроб
+  retry_strategy {
+    maximum_retry_attempts = 3  # Максимальна кількість спроб перезапуску
+  }
+
 }
 
 # Defining backend RDS ECS Task Definition
@@ -97,6 +101,10 @@ resource "aws_ecs_task_definition" "backend_rds_task" {
       ]
     }
   ])
+  # Додаємо параметри для повторних спроб
+  retry_strategy {
+    maximum_retry_attempts = 3  # Максимальна кількість спроб перезапуску
+  }  
 }
 
 
