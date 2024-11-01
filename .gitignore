@@ -1,3 +1,4 @@
 terraform/.terraform/
+terraform/terraform.tfvars
 Message_from_client.txt
 Message_from_team_lead.txt

@@ -1,5 +1,5 @@
 
-
+/*
 
 # Step 6: Create dynamic config.json using templatefile
 resource "local_file" "updated_config" {
@@ -24,7 +24,7 @@ resource "aws_s3_object" "upload_index" {
 }
 
 
-
+*/
 
 
 

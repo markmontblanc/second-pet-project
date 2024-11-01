@@ -1,15 +1,17 @@
+
+
 # Створення групи безпеки для ElastiCache
 resource "aws_security_group" "elasticache_sg" {
   name        = "elasticache-sg"
   description = "Security group for ElastiCache Redis"
-  vpc_id      = aws_vpc.my_petp_vpc.id
+  vpc_id      = module.vpc.vpc_id
 
   # Вхідні правила (ingress)
   ingress {
     from_port   = 6379 # Порт Redis за замовчуванням
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.private_subnet_a.cidr_block, aws_subnet.private_subnet_b.cidr_block] # Доступ лише з приватних підмереж
+    cidr_blocks = module.vpc.private_subnets # Доступ лише з приватних підмереж
   }
 
   # Вихідні правила (egress)
@@ -44,7 +46,7 @@ resource "aws_elasticache_cluster" "redis_cluster" {
 # Підмережна група для ElastiCache
 resource "aws_elasticache_subnet_group" "redis_subnet_group" {
   name       = "redis-subnet-group"
-  subnet_ids = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
+  subnet_ids = module.vpc.private_subnets
 
   tags = {
     Name = "redis-subnet-group-${terraform.workspace}"
@@ -56,3 +58,5 @@ resource "aws_elasticache_subnet_group" "redis_subnet_group" {
 output "redis_primary_endpoint" {
   value = aws_elasticache_cluster.redis_cluster.cache_nodes[0].address
 }
+
+

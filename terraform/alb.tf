@@ -1,9 +1,11 @@
+
+
 resource "aws_lb" "my_alb" {
   name               = "my-alb-${terraform.workspace}"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public_subnet_a.id, aws_subnet.public_subnet_b.id]
+  subnets            = module.vpc.public_subnets
 
   enable_deletion_protection = false
 
@@ -56,7 +58,7 @@ resource "aws_lb_listener_rule" "rds_rule" {
 }
 
 resource "aws_security_group" "alb_sg" {
-  vpc_id = aws_vpc.my_petp_vpc.id
+  vpc_id = module.vpc.vpc_id
 
   ingress {
     from_port   = 80   # HTTP
@@ -96,7 +98,7 @@ resource "aws_lb_target_group" "redis_target_group" {
   name     = "redis-target-group-${terraform.workspace}"
   port     = 8002
   protocol = "HTTP"
-  vpc_id   = aws_vpc.my_petp_vpc.id
+  vpc_id   = module.vpc.vpc_id
 
   health_check {
     protocol            = "HTTP"
@@ -112,7 +114,7 @@ resource "aws_lb_target_group" "backend_rds_target_group" {
   name     = "backend-rds-target-group-${terraform.workspace}"
   port     = 8001
   protocol = "HTTP"
-  vpc_id   = aws_vpc.my_petp_vpc.id
+  vpc_id   = module.vpc.vpc_id
 
   health_check {
     protocol            = "HTTP"

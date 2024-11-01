@@ -3,7 +3,7 @@
 # RDS Subnet Group
 resource "aws_db_subnet_group" "my_db_subnet_group" {
   name       = "my-db-subnet-group-${terraform.workspace}"
-  subnet_ids = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
+  subnet_ids = module.vpc.private_subnets
 
   tags = {
     Name = "my-db-subnet-group-${terraform.workspace}"
@@ -36,7 +36,7 @@ resource "aws_db_instance" "my_postgres_db" {
 resource "aws_security_group" "my_rds_sg" {
   name        = "my-rds-sg-${terraform.workspace}"
   description = "Security group for RDS instance (${terraform.workspace})"
-  vpc_id      = aws_vpc.my_petp_vpc.id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port   = 5432
@@ -56,3 +56,4 @@ resource "aws_security_group" "my_rds_sg" {
     Name = "my-rds-sg-${terraform.workspace}"
   }
 }
+

@@ -1,5 +1,5 @@
 
-
+/*
 
 # Outputs for the ECR repositories
 output "ecr_repository_redis" {
@@ -16,5 +16,7 @@ output "alb_dns" {
   description = "DNS ім'я Application Load Balancer"
 }
 
+
+*/
 
 
