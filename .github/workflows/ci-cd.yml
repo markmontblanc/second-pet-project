@@ -11,6 +11,7 @@ env:
   ECR_URI_REDIS: "654654200977.dkr.ecr.eu-north-1.amazonaws.com/petp_redis_repo_default:latest"
   ECR_URI_BACKEND: "654654200977.dkr.ecr.eu-north-1.amazonaws.com/petp_rds_repo_default:latest"
   TF_VERSION: "1.9.7"
+  CLUSTER_NAME: "ecs-integrated"
     
 jobs:
   build-and-push:
@@ -68,7 +69,7 @@ jobs:
       - name: Update RDS Task
         run: |
           aws ecs update-service \
-          --cluster ${{ secrets.CLUSTER_NAME }} \
+          --cluster ${{ env.CLUSTER_NAME }} \
           --service rds \
           --force-new-deployment \
           --region ${{ env.AWS_REGION }}
