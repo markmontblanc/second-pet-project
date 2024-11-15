@@ -1,5 +1,5 @@
-
 /*
+
 
 # Step 6: Create dynamic config.json using templatefile
 resource "local_file" "updated_config" {
@@ -12,19 +12,19 @@ resource "local_file" "updated_config" {
 
 # Step 7: Upload updated config.json to the S3 bucket
 resource "aws_s3_object" "upload_config" {
-  bucket = aws_s3_bucket.example.id
+  bucket = aws_s3_bucket.petp_tf-bucket.id
   key    = "config.json" # File path in the S3 bucket
   source = local_file.updated_config.filename
 }
 
 resource "aws_s3_object" "upload_index" {
-  bucket = aws_s3_bucket.example.id
+  bucket = aws_s3_bucket.petp_tf-bucket.id
   key    = "index.html"  # Name of the new file in the S3 bucket
   source = "../frontend/templates/index.html"  # Path to the local file you want to upload
 }
 
 
-*/
 
+*/
 
 

@@ -1,20 +1,20 @@
-# Вказуємо базовий образ. Ми використовуємо Python 3.9, але ви можете вибрати іншу версію, якщо потрібно.
 FROM python:3.9-slim
 
-# Створюємо директорію для нашого додатку всередині контейнера
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    python3-dev \
+    build-essential \
+    --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Копіюємо файл з вимогами в контейнер
-COPY requirements.txt ./
+COPY requirements.txt .
 
-# Встановлюємо залежності
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копіюємо весь код додатку в контейнер
 COPY . .
 
-ENV PYTHONUNBUFFERED=1
+EXPOSE 8002
 
-
-# Команда для запуску Django сервера
-CMD ["gunicorn", "--bind", "0.0.0.0:8002", "backend_redis.wsgi:application"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8002"]

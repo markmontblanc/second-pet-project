@@ -54,11 +54,24 @@ module "ecs" {
             {
               name  = "DB_PASSWORD"
               value = "adminadmin76!"
+            },
+            {
+              name  = "CORS_ALLOWED_ORIGINS"
+              value = "https://my-alb-default-197602230.eu-north-1.elb.amazonaws.com,http://petp-tf-bucket.s3-website.eu-north-1.amazonaws.com"
             }
           ]
         }
       }
 
+      load_balancer = {
+        service = {
+          target_group_arn = aws_lb_target_group.backend_rds_target_group.arn
+          container_name   = "rds"
+          container_port   = 8001
+        }
+      }
+
+      depends_on = [aws_lb_listener.http_listener]
 
       subnet_ids = module.vpc.private_subnets
       security_group_ids = [aws_security_group.rds_sg.id]
@@ -94,15 +107,30 @@ module "ecs" {
             {
               name  = "REDIS_DB"
               value = "0"
+            },
+            {
+              name  = "CORS_ALLOWED_ORIGINS"
+              value = "https://my-alb-default-197602230.eu-north-1.elb.amazonaws.com,http://petp-tf-bucket.s3-website.eu-north-1.amazonaws.com"
             }
           ]
         }
       }
 
+      load_balancer = {
+        service = {
+          target_group_arn = aws_lb_target_group.redis_target_group.arn
+          container_name   = "redis"
+          container_port   = 8002
+        }
+      }
+
+      depends_on = [aws_lb_listener.http_listener]
+      
       subnet_ids = module.vpc.private_subnets
       security_group_ids = [aws_security_group.redis_sg.id]
     }
   }
+
 
   tags = {
     Environment = "Development"

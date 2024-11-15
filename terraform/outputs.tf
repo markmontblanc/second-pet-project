@@ -1,5 +1,5 @@
 
-/*
+
 
 # Outputs for the ECR repositories
 output "ecr_repository_redis" {
@@ -17,6 +17,6 @@ output "alb_dns" {
 }
 
 
-*/
+
 
 

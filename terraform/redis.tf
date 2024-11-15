@@ -11,7 +11,7 @@ resource "aws_security_group" "elasticache_sg" {
     from_port   = 6379 # Порт Redis за замовчуванням
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = module.vpc.private_subnets # Доступ лише з приватних підмереж
+    cidr_blocks = ["10.0.1.0/24", "10.0.2.0/24"] # Доступ лише з приватних підмереж
   }
 
   # Вихідні правила (egress)

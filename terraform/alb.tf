@@ -20,14 +20,19 @@ resource "aws_lb_listener" "http_listener" {
   protocol          = "HTTP"
 
   default_action {
-    type = "forward"
-    target_group_arn = aws_lb_target_group.backend_rds_target_group.arn  # Default to backend RDS
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "404: Not Found"
+      status_code  = "404"
+    }
   }
 }
 
 resource "aws_lb_listener_rule" "my_rule" {
   listener_arn = aws_lb_listener.http_listener.arn
   priority     = 1
+
 
   action {
     type = "forward"
@@ -36,7 +41,7 @@ resource "aws_lb_listener_rule" "my_rule" {
 
   condition {
     path_pattern {
-      values = ["/test_connection/redis/*"]
+      values = ["/test_connection/redis"]
     }
   }
 }
@@ -52,7 +57,7 @@ resource "aws_lb_listener_rule" "rds_rule" {
 
   condition {
     path_pattern {
-      values = ["/test_connection/rds/*"]
+      values = ["/test_connection/rds"]
     }
   }
 }
@@ -98,7 +103,12 @@ resource "aws_lb_target_group" "redis_target_group" {
   name     = "redis-target-group-${terraform.workspace}"
   port     = 8002
   protocol = "HTTP"
-  vpc_id   = module.vpc.vpc_id
+  
+
+  target_type = "ip"
+
+  
+  vpc_id            = module.vpc.vpc_id
 
   health_check {
     protocol            = "HTTP"
@@ -114,7 +124,10 @@ resource "aws_lb_target_group" "backend_rds_target_group" {
   name     = "backend-rds-target-group-${terraform.workspace}"
   port     = 8001
   protocol = "HTTP"
-  vpc_id   = module.vpc.vpc_id
+  
+  vpc_id            = module.vpc.vpc_id
+
+  target_type = "ip"
 
   health_check {
     protocol            = "HTTP"

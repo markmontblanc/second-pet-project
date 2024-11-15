@@ -68,6 +68,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend_redis.wsgi.application'
 
 
+"""
 # Database
 DATABASES = {
     'default': {
@@ -75,6 +76,8 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+"""
+
 
 # Redis settings (NEW)
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis')  # default to 'localhost' if not provided
