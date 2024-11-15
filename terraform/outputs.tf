@@ -16,6 +16,9 @@ output "alb_dns" {
   description = "DNS ім'я Application Load Balancer"
 }
 
+output "s3_module_outputs" {
+  value = module.s3_bucket
+}
 
 
 
