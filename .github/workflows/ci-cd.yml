@@ -68,7 +68,7 @@ jobs:
       - name: Update RDS Task
         run: |
           aws ecs update-service \
-          --cluster ${{ env.CLUSTER_NAME }} \
+          --cluster ${{ secrets.CLUSTER_NAME }} \
           --service rds \
           --force-new-deployment \
           --region ${{ env.AWS_REGION }}
