@@ -3,7 +3,7 @@ name: CI/CD for ECS Updates
 on:
   push:
     branches:
-      - master 
+      - main 
 
 
 env:
@@ -83,3 +83,4 @@ jobs:
 
 
 
+ 

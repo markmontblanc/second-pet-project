@@ -22,7 +22,7 @@ This project is an online store for mobile accessories, focused on providing a s
 ## Architecture
 The architecture is designed to be lightweight, secure, and scalable to handle regular traffic as well as peak periods.
 
-![Architecture Overview](images/architecture.png "Architecture Overview")
+![Architecture Overview](images/architecture.jpg "Architecture Overview")
 
 ### Backend Services
 - **Compute Options**: Uses ECS based on the optimal performance-to-cost balance.
